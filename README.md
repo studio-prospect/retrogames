@@ -1,19 +1,19 @@
-# Retrogames
+# レトロゲームズ
 
-A collection of classic retro games recreated for modern web browsers. Experience nostalgic gaming with pixel-perfect graphics and authentic gameplay mechanics.
+モダンなWebブラウザで再現されたクラシックなレトロゲームのコレクション。ピクセルパーフェクトなグラフィックと本格的なゲームプレイメカニクスで懐かしいゲーム体験をお楽しみください。
 
-## Features
+## 機能
 
-- Classic arcade-style games
-- Retro pixel art graphics
-- Simple, intuitive controls
-- Browser-based gameplay
-- Responsive design for desktop and mobile
+- クラシックなアーケードスタイルのゲーム
+- レトロなピクセルアートグラフィック
+- シンプルで直感的な操作
+- ブラウザベースのゲームプレイ
+- デスクトップとモバイルに対応したレスポンシブデザイン
 
-## Games Included
+## 収録ゲーム
 
-Coming soon - various classic retro games will be available to play.
+近日公開予定 - 様々なクラシックレトロゲームがプレイ可能になります。
 
-## Getting Started
+## はじめに
 
-Instructions for running and playing the games will be added as development progresses.
+ゲームの実行とプレイ方法については、開発の進行に合わせて追加される予定です。
