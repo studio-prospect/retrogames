@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOFT LANDING - レトロゲームズ</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .game-container {
+            text-align: center;
+            border: 2px solid #0f0;
+            padding: 20px;
+            background: #001100;
+        }
+        
+        h1 {
+            margin: 0 0 20px 0;
+            font-size: 24px;
+            letter-spacing: 2px;
+        }
+        
+        canvas {
+            border: 1px solid #0f0;
+            background: #000;
+            display: block;
+            margin: 0 auto 20px auto;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .info-panel {
+            display: flex;
+            gap: 40px;
+            font-family: monospace;
+        }
+        
+        .instructions {
+            font-size: 12px;
+            line-height: 1.5;
+            text-align: left;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .game-over {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 17, 0, 0.9);
+            border: 2px solid #0f0;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        button {
+            background: #000;
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 10px 20px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            margin: 10px;
+        }
+        
+        button:hover {
+            background: #0f0;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>SOFT LANDING</h1>
+        
+        <div class="controls">
+            <div class="info-panel">
+                <div>燃料: <span id="fuel">1000</span></div>
+                <div>高度: <span id="altitude">2000</span>m</div>
+                <div>垂直速度: <span id="velocity">0.0</span>m/s</div>
+                <div>水平速度: <span id="horizontal-velocity">0.0</span>m/s</div>
+            </div>
+            <button onclick="restartGame()">リスタート</button>
+        </div>
+        
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div class="instructions">
+            <strong>操作方法:</strong><br>
+            • ↑キー または Wキー: メインエンジン噴射（上向き推力）<br>
+            • ←キー または Aキー: 左向き推力<br>
+            • →キー または Dキー: 右向き推力<br>
+            • スペースキー: ゲーム開始/一時停止<br><br>
+            
+            <strong>ミッション:</strong><br>
+            アポロ月着陸船を安全に月面に軟着陸させよう！<br>
+            着陸時の垂直速度は5m/s以下、水平速度は3m/s以下で着陸する必要があります。<br>
+            燃料に注意して、慎重に操縦してください。
+        </div>
+        
+        <div id="gameOver" class="game-over">
+            <h2 id="gameOverTitle">ミッション完了！</h2>
+            <p id="gameOverMessage">素晴らしい着陸でした！</p>
+            <button onclick="restartGame()">再挑戦</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameState = {
+            lander: {
+                x: 400,
+                y: 50,
+                vx: 0,
+                vy: 0,
+                angle: 0,
+                fuel: 1000,
+                width: 20,
+                height: 30,
+                thrustPower: 0.3,
+                crashed: false,
+                landed: false
+            },
+            terrain: [],
+            landingPads: [],
+            keys: {},
+            gameRunning: false,
+            gravity: 0.1
+        };
+        
+        function initTerrain() {
+            gameState.terrain = [];
+            gameState.landingPads = [];
+            
+            for (let x = 0; x <= canvas.width; x += 10) {
+                let height = 500 + Math.sin(x * 0.01) * 50 + Math.random() * 30;
+                gameState.terrain.push({ x: x, y: height });
+            }
+            
+            gameState.landingPads = [
+                { x: 200, y: gameState.terrain[20].y, width: 80 },
+                { x: 400, y: gameState.terrain[40].y, width: 100 },
+                { x: 600, y: gameState.terrain[60].y, width: 80 }
+            ];
+            
+            gameState.landingPads.forEach(pad => {
+                for (let i = 0; i < gameState.terrain.length; i++) {
+                    if (gameState.terrain[i].x >= pad.x && gameState.terrain[i].x <= pad.x + pad.width) {
+                        gameState.terrain[i].y = pad.y;
+                    }
+                }
+            });
+        }
+        
+        function drawLander() {
+            ctx.save();
+            ctx.translate(gameState.lander.x, gameState.lander.y);
+            ctx.rotate(gameState.lander.angle);
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(0, -15);
+            ctx.lineTo(-10, 15);
+            ctx.lineTo(10, 15);
+            ctx.closePath();
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(-15, 10);
+            ctx.lineTo(-10, 15);
+            ctx.lineTo(-5, 20);
+            ctx.moveTo(15, 10);
+            ctx.lineTo(10, 15);
+            ctx.lineTo(5, 20);
+            ctx.stroke();
+            
+            if (gameState.keys['ArrowUp'] || gameState.keys['w'] || gameState.keys['W']) {
+                ctx.strokeStyle = '#ff0';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(-3, 15);
+                ctx.lineTo(0, 25 + Math.random() * 5);
+                ctx.lineTo(3, 15);
+                ctx.stroke();
+            }
+            
+            if (gameState.keys['ArrowLeft'] || gameState.keys['a'] || gameState.keys['A']) {
+                ctx.strokeStyle = '#ff0';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(10, 0);
+                ctx.lineTo(20 + Math.random() * 3, 0);
+                ctx.stroke();
+            }
+            
+            if (gameState.keys['ArrowRight'] || gameState.keys['d'] || gameState.keys['D']) {
+                ctx.strokeStyle = '#ff0';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-10, 0);
+                ctx.lineTo(-20 - Math.random() * 3, 0);
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+        
+        function drawTerrain() {
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height);
+            
+            for (let i = 0; i < gameState.terrain.length; i++) {
+                ctx.lineTo(gameState.terrain[i].x, gameState.terrain[i].y);
+            }
+            
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.stroke();
+            
+            gameState.landingPads.forEach(pad => {
+                ctx.strokeStyle = '#ff0';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(pad.x, pad.y);
+                ctx.lineTo(pad.x + pad.width, pad.y);
+                ctx.stroke();
+            });
+        }
+        
+        function updatePhysics() {
+            if (!gameState.gameRunning || gameState.lander.crashed || gameState.lander.landed) return;
+            
+            gameState.lander.vy += gameState.gravity;
+            
+            if ((gameState.keys['ArrowUp'] || gameState.keys['w'] || gameState.keys['W']) && gameState.lander.fuel > 0) {
+                gameState.lander.vy -= gameState.lander.thrustPower * Math.cos(gameState.lander.angle);
+                gameState.lander.vx -= gameState.lander.thrustPower * Math.sin(gameState.lander.angle);
+                gameState.lander.fuel -= 2;
+            }
+            
+            if ((gameState.keys['ArrowLeft'] || gameState.keys['a'] || gameState.keys['A']) && gameState.lander.fuel > 0) {
+                gameState.lander.vx -= 0.1;
+                gameState.lander.angle -= 0.05;
+                gameState.lander.fuel -= 1;
+            }
+            
+            if ((gameState.keys['ArrowRight'] || gameState.keys['d'] || gameState.keys['D']) && gameState.lander.fuel > 0) {
+                gameState.lander.vx += 0.1;
+                gameState.lander.angle += 0.05;
+                gameState.lander.fuel -= 1;
+            }
+            
+            gameState.lander.x += gameState.lander.vx;
+            gameState.lander.y += gameState.lander.vy;
+            
+            if (gameState.lander.x < 0) gameState.lander.x = 0;
+            if (gameState.lander.x > canvas.width) gameState.lander.x = canvas.width;
+            
+            checkCollisions();
+        }
+        
+        function checkCollisions() {
+            const lander = gameState.lander;
+            
+            for (let i = 0; i < gameState.terrain.length - 1; i++) {
+                const p1 = gameState.terrain[i];
+                const p2 = gameState.terrain[i + 1];
+                
+                if (lander.x >= p1.x && lander.x <= p2.x) {
+                    const terrainY = p1.y + (p2.y - p1.y) * ((lander.x - p1.x) / (p2.x - p1.x));
+                    
+                    if (lander.y + lander.height/2 >= terrainY) {
+                        const isOnLandingPad = gameState.landingPads.some(pad => 
+                            lander.x >= pad.x && lander.x <= pad.x + pad.width
+                        );
+                        
+                        if (isOnLandingPad && Math.abs(lander.vy) <= 5 && Math.abs(lander.vx) <= 3) {
+                            lander.landed = true;
+                            lander.vy = 0;
+                            lander.vx = 0;
+                            showGameOver("ミッション成功！", "完璧な軟着陸でした！");
+                        } else {
+                            lander.crashed = true;
+                            showGameOver("ミッション失敗", 
+                                isOnLandingPad ? 
+                                "着陸速度が速すぎます！" : 
+                                "着陸パッドに着陸してください！"
+                            );
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        
+        function updateUI() {
+            document.getElementById('fuel').textContent = Math.max(0, gameState.lander.fuel);
+            document.getElementById('altitude').textContent = Math.max(0, Math.round(canvas.height - gameState.lander.y - 300));
+            document.getElementById('velocity').textContent = gameState.lander.vy.toFixed(1);
+            document.getElementById('horizontal-velocity').textContent = gameState.lander.vx.toFixed(1);
+        }
+        
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#fff';
+            for (let i = 0; i < 100; i++) {
+                ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height / 2, 1, 1);
+            }
+            
+            drawTerrain();
+            drawLander();
+            
+            if (!gameState.gameRunning && !gameState.lander.crashed && !gameState.lander.landed) {
+                ctx.fillStyle = '#0f0';
+                ctx.font = '24px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('スペースキーでゲーム開始', canvas.width/2, canvas.height/2);
+            }
+        }
+        
+        function showGameOver(title, message) {
+            document.getElementById('gameOverTitle').textContent = title;
+            document.getElementById('gameOverMessage').textContent = message;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+        
+        function restartGame() {
+            gameState.lander = {
+                x: 400,
+                y: 50,
+                vx: 0,
+                vy: 0,
+                angle: 0,
+                fuel: 1000,
+                width: 20,
+                height: 30,
+                thrustPower: 0.3,
+                crashed: false,
+                landed: false
+            };
+            gameState.gameRunning = false;
+            document.getElementById('gameOver').style.display = 'none';
+            initTerrain();
+        }
+        
+        function gameLoop() {
+            updatePhysics();
+            updateUI();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        document.addEventListener('keydown', (e) => {
+            gameState.keys[e.key] = true;
+            
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (!gameState.lander.crashed && !gameState.lander.landed) {
+                    gameState.gameRunning = !gameState.gameRunning;
+                }
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            gameState.keys[e.key] = false;
+        });
+        
+        initTerrain();
+        gameLoop();
+    </script>
+</body>
+</html>
